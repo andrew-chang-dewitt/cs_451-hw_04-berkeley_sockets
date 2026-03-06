@@ -1,0 +1,4 @@
+fabrictestbed_extensions>=1.9.6
+jupyter-console>=6.6.3
+jupyterlab>=4.5.2
+euporie>=2.10.3

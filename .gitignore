@@ -1,0 +1,10 @@
+.fab_tok
+fabric_rc
+*.swp
+*.swo
+target/
+*.o
+*.swo
+*.swp
+gmon.out
+*.d

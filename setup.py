@@ -29,4 +29,5 @@ for i in range(1,11):
 
 net = hw_04.add_l2network(name="net",interfaces=nics)
 
+# FIXME: this creates slice ok, but then hangs forever in wait_ssh?
 hw_04.submit()

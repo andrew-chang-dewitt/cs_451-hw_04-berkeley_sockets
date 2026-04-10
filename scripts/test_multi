@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+prj_root=`dirname $(realpath "$0")`/..
+tgt_dir=$prj_root/target
+rel_dir=$tgt_dir/release
+rel_bin_dir=$rel_dir/bin
+dbg_dir=$tgt_dir/debug
+dbg_bin_dir=$tgt_dir/debug/bin
+
+life_dir=$prj_root
+life_exe=$rel_bin_dir/granular_multithreaded_life
+life_dbg=$dbg_bin_dir/granular_multithreaded_life
+
+# blinker
+# 0 0 0 0    0 1 0 0  part 1
+# 1 1 1 0 -> 0 1 0 0 _ _ _ _ _
+# 0 0 0 0 <- 0 1 0 0
+# 0 0 0 0    0 0 0 0  part 2
+args=" -s 4 -c 5 -g 2 -i 0000111"
+# glider & blinker
+# args=" -s 10 -c 100 -i 010000000000100011101110000000"
+# args=" -s 50 -c 100 -i 010000000000000000000000000000000000000000000000000010001110000000000000000000000000000000000000000011100000000000000000000000000000000000000000000000"
+
+# build
+echo "Building life binaries..."
+echo ""
+cd $life_dir
+make PRETTY=true DBG=true gran || { x=$? printf "\nfailed while building, bailing...\n\n\n"; exit $x; }
+echo ""
+echo "Executing gran w/ args '$args'..."
+echo ""
+$life_dbg $args || { x=$? printf "\nfailed while executing '$args', bailing...\n\n\n"; exit $x; }
+echo ""
+echo "done."
+echo ""
+echo ""

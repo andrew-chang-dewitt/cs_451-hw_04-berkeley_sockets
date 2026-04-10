@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+
+prj_root=`dirname $(realpath "$0")`/..
+tgt_dir=$prj_root/target
+
+rel_dir=$tgt_dir/release
+rel_bin_dir=$rel_dir/bin
+dbg_dir=$tgt_dir/debug
+dbg_bin_dir=$dbg_dir/bin
+gmon_dir=$tgt_dir/gmon
+
+multi_exe=$rel_bin_dir/multithreaded_life
+multi_dbg=$dbg_bin_dir/multithreaded_life
+gran_exe=$rel_bin_dir/granular_multithreaded_life
+gran_dbg=$dbg_bin_dir/granular_multithreaded_life
+
+report_dir=$prj_root/report
+
+# glider & blinker
+args=" -s 50 -c 100 -i 010000000000000000000000000000000000000000000000000010001110000000000000000000000000000000000000000011100000000000000000000000000000000000000000000000"
+
+# clear & reset report & target directories
+cd $prj_root
+rm -rf $report_dir || { x=$? printf "\nfailed while building, bailing...\n\n\n"; exit $x; }
+rm -rf $tgt_dir || { x=$? printf "\nfailed while building, bailing...\n\n\n"; exit $x; }
+mkdir -p $report_dir || { x=$? printf "\nfailed while building, bailing...\n\n\n"; exit $x; }
+
+# build multi
+printf "Building multithreaded_life binaries..."
+goal=multi
+step=a
+make $goal > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while building $goal (step $step), bailing...\n\n\n"; exit $x; }
+make PRF=true $goal > /dev/null 2>&1 || { x=$? printf "\nfailed while building PRF $goal, bailing...\n\n\n"; exit $x; }
+printf "...done.\n"
+echo ""
+
+# run tests on multi
+printf "Measuring multi runtime..."
+step=b
+{ time $multi_exe $args; } > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while measuring time (step $step), bailing...\n\n\n"; exit $x; }
+printf "...done.\n"
+echo ""
+printf "Checking multi for memory leaks..."
+step=c
+valgrind --leak-check=full $multi_exe $args > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while checking mem (step $step), bailing...\n\n\n"; exit $x; }
+printf "...done.\n"
+echo ""
+printf "Profiling multi..."
+step=d
+mkdir -p $gmon_dir
+cd $gmon_dir
+$multi_dbg $args > /dev/null 2>&1 || { x=$? printf "\nfailed while profiling (step $step), bailing...\n\n\n"; exit $x; }
+gprof $multi_dbg gmon.out > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while profiling (step $step), bailing...\n\n\n"; exit $x; }
+cd $prj_root
+printf "...done.\n"
+echo ""
+
+# build gran
+printf "Building granular_multithreaded_life binaries..."
+goal=gran
+step=e
+make $goal > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while building $goal (step $step), bailing...\n\n\n"; exit $x; }
+make PRF=true $goal > /dev/null 2>&1 || { x=$? printf "\nfailed while building PRF $goal, bailing...\n\n\n"; exit $x; }
+printf "...done.\n"
+echo ""
+
+# run tests on gran
+printf "Measuring gran runtime..."
+step=f
+for g in {1..10}; do
+    echo "with G=$g..." >> $report_dir/$step.err
+    { time $gran_exe -g $g $args; } >> $report_dir/$step.out 2>> $report_dir/$step.err || { x=$? printf "\nfailed while measuring time (step $step), bailing...\n\n\n"; exit $x; }
+    echo "" >> $report_dir/$step.err
+done
+printf "...done.\n"
+echo ""
+printf "Checking gran for memory leaks..."
+step=g
+valgrind --leak-check=full $gran_exe -g 10 $args > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while checking mem (step $step), bailing...\n\n\n"; exit $x; }
+printf "...done.\n"
+echo ""
+printf "Profiling gran..."
+step=h
+mkdir -p $gmon_dir
+cd $gmon_dir
+$gran_dbg -g 10 $args > /dev/null 2>&1 || { x=$? printf "\nfailed while profiling (step $step), bailing...\n\n\n"; exit $x; }
+gprof $gran_dbg gmon.out > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while profiling (step $step), bailing...\n\n\n"; exit $x; }
+printf "...done.\n"
+echo ""

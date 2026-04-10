@@ -6,7 +6,7 @@ CFLAGS    += -Wall -Wextra -Wformat=2 -Wswitch-default -Wcast-align \
 	     -Wundef -Wnested-externs -Wcast-qual -Wshadow -Wwrite-strings \
 	     -Wconversion -Wunreachable-code -Wstrict-aliasing=2 -fno-common \
 	     -fstrict-aliasing -std=c99 -pedantic
-	     
+
 DBG_FLAGS  = -O0 -g -include stdbool.h
 REL_FLAGS  = -O3
 PRF_FLAGS  = -pg
@@ -49,25 +49,16 @@ SRC_DIR   := $(LOC)
 # https://make.mad-scientist.net/papers/advanced-auto-dependency-generation/#tldr
 DEP_FLAGS  = -MT $@ -MMD -MP -MF $(DEP_DIR)/$*.d
 
-NAMES     := life multithreaded_life granular_multithreaded_life
+NAMES     := berkeley_multithreaded_life
 SRCS      := $(wildcard $(SRC_DIR)/*.c)
 BINS      := $(NAMES:%=$(BIN_DIR)/%)
 OBJS       = $(patsubst $(SRC_DIR)/%.h,$(OBJ_DIR)/%.o,$(wildcard $(SRC_DIR)/*.h))
 
 
-.PHONY: clean all life multi gran list_bins
-
-all: life multi gran
+build: $(BIN_DIR)/berkeley_life
 
 
-life: $(BIN_DIR)/life
-
-
-multi: $(BIN_DIR)/multithreaded_life
-
-
-gran: $(BIN_DIR)/granular_multithreaded_life
-
+.PHONY: clean list
 
 $(BIN_DIR) $(OBJ_DIR) $(DEP_DIR): %:
 	@mkdir -p $@

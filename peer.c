@@ -142,3 +142,42 @@ void peer_close(Peer *peer) {
   close(peer->fd);
   free(peer);
 }
+
+uint32_t decode_u32(const unsigned char *buf) {
+  return ((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16) |
+         ((uint32_t)buf[2] << 8) | (uint32_t)buf[3];
+}
+
+int recv_config(Peer *peer, uint32_t *world_size, uint32_t *cycles,
+                uint32_t *part_start, uint32_t *part_end) {
+  unsigned char buf[16];
+  if (peer_recv(peer, buf, 16) != 0)
+    return -1;
+  *world_size = decode_u32(buf);
+  *cycles = decode_u32(buf + 4);
+  *part_start = decode_u32(buf + 8);
+  *part_end = decode_u32(buf + 12);
+  return 0;
+}
+
+int send_config(Peer *peer, uint32_t world_size, uint32_t cycles,
+                uint32_t part_start, uint32_t part_end) {
+  unsigned char buf[16];
+  buf[0] = (unsigned char)(world_size >> 24);
+  buf[1] = (unsigned char)(world_size >> 16);
+  buf[2] = (unsigned char)(world_size >> 8);
+  buf[3] = (unsigned char)(world_size);
+  buf[4] = (unsigned char)(cycles >> 24);
+  buf[5] = (unsigned char)(cycles >> 16);
+  buf[6] = (unsigned char)(cycles >> 8);
+  buf[7] = (unsigned char)(cycles);
+  buf[8] = (unsigned char)(part_start >> 24);
+  buf[9] = (unsigned char)(part_start >> 16);
+  buf[10] = (unsigned char)(part_start >> 8);
+  buf[11] = (unsigned char)(part_start);
+  buf[12] = (unsigned char)(part_end >> 24);
+  buf[13] = (unsigned char)(part_end >> 16);
+  buf[14] = (unsigned char)(part_end >> 8);
+  buf[15] = (unsigned char)(part_end);
+  return peer_send(peer, buf, 16);
+}

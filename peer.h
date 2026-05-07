@@ -2,6 +2,7 @@
 #define PEERH
 
 #include <stddef.h>
+#include <stdint.h>
 
 typedef struct {
   int fd;
@@ -17,6 +18,12 @@ int peer_send(Peer *peer, const unsigned char *buf, size_t n);
 int peer_recv(Peer *peer, unsigned char *buf, size_t n);
 // close the connection and free the Peer
 void peer_close(Peer *peer);
+// worker gets config from main
+int recv_config(Peer *peer, uint32_t *world_size, uint32_t *cycles,
+                uint32_t *part_start, uint32_t *part_end);
+// main sends  config to worker
+int send_config(Peer *peer, uint32_t world_size, uint32_t cycles,
+                uint32_t part_start, uint32_t part_end);
 
 // example usage:
 //

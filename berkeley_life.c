@@ -20,9 +20,9 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <stdint.h>
-#include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
 
 #ifndef ARGH
 #include "args.h"
@@ -34,23 +34,10 @@
 #include "world.h"
 #endif
 
-static void set_nodelay(Peer *p) {
+// set to avoid issues w/ TCP deadlocks in local WSL dev env
+static void set_nodelay(Peer *peer) {
   int one = 1;
-  setsockopt(p->fd, IPPROTO_TCP, TCP_NODELAY, &one, (socklen_t)sizeof(one));
-}
-
-static int send_config(Peer *p, uint32_t world_size, uint32_t cycles,
-                       uint32_t part_start, uint32_t part_end) {
-  unsigned char buf[16];
-  buf[0]  = (unsigned char)(world_size >> 24); buf[1]  = (unsigned char)(world_size >> 16);
-  buf[2]  = (unsigned char)(world_size >> 8);  buf[3]  = (unsigned char)(world_size);
-  buf[4]  = (unsigned char)(cycles >> 24);     buf[5]  = (unsigned char)(cycles >> 16);
-  buf[6]  = (unsigned char)(cycles >> 8);      buf[7]  = (unsigned char)(cycles);
-  buf[8]  = (unsigned char)(part_start >> 24); buf[9]  = (unsigned char)(part_start >> 16);
-  buf[10] = (unsigned char)(part_start >> 8);  buf[11] = (unsigned char)(part_start);
-  buf[12] = (unsigned char)(part_end >> 24);   buf[13] = (unsigned char)(part_end >> 16);
-  buf[14] = (unsigned char)(part_end >> 8);    buf[15] = (unsigned char)(part_end);
-  return peer_send(p, buf, 16);
+  setsockopt(peer->fd, IPPROTO_TCP, TCP_NODELAY, &one, (socklen_t)sizeof(one));
 }
 
 int main(int argc, char *const *argv) {
@@ -63,8 +50,7 @@ int main(int argc, char *const *argv) {
   // accept one connection per worker on consecutive ports
   Peer **peers = malloc(cfg.num_parts * sizeof(*peers));
   for (unsigned int i = 0; i < cfg.num_parts; i++) {
-    peers[i] =
-        peer_accept((unsigned short)((unsigned int)cfg.port + i));
+    peers[i] = peer_accept((unsigned short)((unsigned int)cfg.port + i));
     if (!peers[i]) {
       fprintf(stderr, "failed to accept worker %u\n", i);
       return EXIT_FAILURE;
@@ -72,7 +58,8 @@ int main(int argc, char *const *argv) {
     set_nodelay(peers[i]);
   }
 
-  // send each worker its config in one shot: world_size, cycles, part_start, part_end
+  // send each worker its config in one shot: world_size, cycles, part_start,
+  // part_end
   unsigned long part_start = 0;
   for (unsigned int i = 0; i < cfg.num_parts; i++) {
     unsigned long part_end = part_start + cfg.parts[i];

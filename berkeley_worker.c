@@ -3,9 +3,9 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <stdint.h>
-#include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
 #include <time.h>
 
 #ifndef PEERH
@@ -14,23 +14,6 @@
 #ifndef STEPH
 #include "step.h"
 #endif
-
-static uint32_t decode_u32(const unsigned char *b) {
-  return ((uint32_t)b[0] << 24) | ((uint32_t)b[1] << 16) |
-         ((uint32_t)b[2] << 8)  | (uint32_t)b[3];
-}
-
-static int recv_config(Peer *p, uint32_t *world_size, uint32_t *cycles,
-                       uint32_t *part_start, uint32_t *part_end) {
-  unsigned char buf[16];
-  if (peer_recv(p, buf, 16) != 0)
-    return -1;
-  *world_size  = decode_u32(buf);
-  *cycles      = decode_u32(buf + 4);
-  *part_start  = decode_u32(buf + 8);
-  *part_end    = decode_u32(buf + 12);
-  return 0;
-}
 
 int main(int argc, char *argv[]) {
   if (argc < 3) {
@@ -57,16 +40,19 @@ int main(int argc, char *argv[]) {
   }
 
   int one = 1;
-  setsockopt(main_node->fd, IPPROTO_TCP, TCP_NODELAY, &one, (socklen_t)sizeof(one));
+  setsockopt(main_node->fd, IPPROTO_TCP, TCP_NODELAY, &one,
+             (socklen_t)sizeof(one));
 
   uint32_t world_size, cycles, part_start, part_end;
-  if (recv_config(main_node, &world_size, &cycles, &part_start, &part_end) != 0) {
+  if (recv_config(main_node, &world_size, &cycles, &part_start, &part_end) !=
+      0) {
     fprintf(stderr, "failed to receive config\n");
     peer_close(main_node);
     return EXIT_FAILURE;
   }
 
-  unsigned long step_size = (unsigned long)world_size * (unsigned long)world_size;
+  unsigned long step_size =
+      (unsigned long)world_size * (unsigned long)world_size;
   unsigned long part_rows = (unsigned long)(part_end - part_start);
 
   char *cur_step = malloc(step_size);
@@ -84,10 +70,11 @@ int main(int argc, char *argv[]) {
     step_part(cur_step, (unsigned long)part_start, (unsigned long)part_end,
               (unsigned long)world_size, new_step);
 
-    if (peer_send(main_node,
-                  (const unsigned char *)(new_step +
-                                          (unsigned long)part_start * (unsigned long)world_size),
-                  part_rows * (unsigned long)world_size) != 0)
+    if (peer_send(
+            main_node,
+            (const unsigned char *)(new_step + (unsigned long)part_start *
+                                                   (unsigned long)world_size),
+            part_rows * (unsigned long)world_size) != 0)
       break;
   }
 

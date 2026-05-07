@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 make all          # build gran (release)
-make gran         # granular multithreaded life
+make berk         # build berkeley_life binary
 make test         # build & run peer tests
 make clean        # remove target/
 
@@ -21,13 +21,13 @@ Binaries land in `target/release/bin/` or `target/debug/bin/` depending on mode.
 ## Run
 
 ```bash
-./target/release/bin/granular_multithreaded_life -s <size> -c <cycles> -g <num_parts> -i <init_string>
+./target/release/bin/berkeley_life -s <size> -c <cycles> -g <num_parts> -i <init_string>
 ```
 
 Example:
 ```bash
 # Glider (10x10, 8 cycles, 4 partitions)
-./target/release/bin/granular_multithreaded_life -s 10 -c 8 -g 4 -i 0100000000001000000011100000000000000000000000000000000000000000000000000000000000000000000000000000000000
+./target/release/bin/berkeley_life -s 10 -c 8 -g 4 -i 0100000000001000000011100000000000000000000000000000000000000000000000000000000000000000000000000000000000
 ```
 
 ## Python / FABRIC tooling
@@ -47,8 +47,7 @@ C implementations share common modules:
 
 | File | Role |
 |------|------|
-| `granular_multithreaded_life.c` | Finer-grained thread partitioning |
-| `berkeley_life.c` | Distributed (FABRIC) — currently empty |
+| `berkeley_life.c` | Granular multithreaded GoL (FABRIC target) |
 | `world.c/h` | World state: `init_world`, `print_world`, accessors |
 | `step.c/h` | `step()` (single-thread), `step_part()` (partition-aware) |
 | `args.c/h` | CLI parsing → `Config` struct |

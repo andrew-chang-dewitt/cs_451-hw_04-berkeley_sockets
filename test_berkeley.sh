@@ -2,14 +2,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-GRAN="$SCRIPT_DIR/target/release/bin/granular_multithreaded_life"
+BERK="$SCRIPT_DIR/target/release/bin/berkeley_life"
 
 PASS=0
 FAIL=0
 
-# let make determine if/when to build GRAN
+# let make determine if/when to build BERK
 echo "Building..."
-make -C "$SCRIPT_DIR" gran
+make -C "$SCRIPT_DIR" berk
 
 run_test() {
     local name="$1" size="$2" cycles="$3" init="$4" expected="$5"
@@ -18,7 +18,7 @@ run_test() {
 
     for g in "${granularities[@]}"; do
         local result
-        result=$("$GRAN" -s "$size" -c "$cycles" -i "$init" -g "$g")
+        result=$("$BERK" -s "$size" -c "$cycles" -i "$init" -g "$g")
         if [[ "$result" == "$expected" ]]; then
             echo "PASS  $name  g=$g"
             (( ++PASS ))

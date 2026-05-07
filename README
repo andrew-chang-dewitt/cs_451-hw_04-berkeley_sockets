@@ -1,1 +1,6 @@
-See the accompanying post on Canvas.
+TODO:
+
+- [x] implement distributed life w/ berkely sockets
+- [x] test that it works w/ multiple procs on one machine using loopback
+- [ ] script fabric setup
+- [ ] gen report on fabric

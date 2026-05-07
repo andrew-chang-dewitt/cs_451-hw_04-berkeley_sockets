@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+
+prj_root=`dirname $(realpath "$0")`/..
+tgt_dir=$prj_root/target
+
+rel_dir=$tgt_dir/release
+rel_bin_dir=$rel_dir/bin
+dbg_dir=$tgt_dir/debug
+dbg_bin_dir=$dbg_dir/bin
+gmon_dir=$tgt_dir/gmon
+
+berk_name=berkeley_life
+worker_name=berkeley_worker
+
+berk_exe=$rel_bin_dir/$berk_name
+berk_dbg=$dbg_bin_dir/$berk_name
+
+worker_exe=$rel_bin_dir/$worker_name
+worker_dbg=$dbg_bin_dir/$worker_name
+
+report_dir=$prj_root/outputs
+
+# glider & blinker
+args=" -s 50 -c 100 -i 010000000000000000000000000000000000000000000000000010001110000000000000000000000000000000000000000011100000000000000000000000000000000000000000000000"
+
+# clear & reset report & target directories
+cd $prj_root
+rm -rf $report_dir || { x=$? printf "\nfailed while cleaning old reports, bailing...\n\n\n"; exit $x; }
+mkdir -p $report_dir || { x=$? printf "\nfailed while setting up new reports dir, bailing...\n\n\n"; exit $x; }
+rm -rf $tgt_dir || { x=$? printf "\nfailed while cleaning old build artifacts, bailing...\n\n\n"; exit $x; }
+
+# build binary
+printf "Building binaries..."
+goal=berk
+step=a
+make $goal > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while building $goal (step $step), bailing...\n\n\n"; exit $x; }
+make PRF=true $goal > /dev/null 2>&1 || { x=$? printf "\nfailed while building PRF $goal, bailing...\n\n\n"; exit $x; }
+goal=worker
+make $goal >> $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while building $goal (step $step), bailing...\n\n\n"; exit $x; }
+make PRF=true $goal > /dev/null 2>&1 || { x=$? printf "\nfailed while building PRF $goal, bailing...\n\n\n"; exit $x; }
+printf "...done.\n"
+echo ""
+
+# run tests
+printf "Measuring runtime..."
+step=b
+{ time $openmp_exe $args; } > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while measuring time (step $step), bailing...\n\n\n"; exit $x; }
+printf "...done.\n"
+echo ""
+printf "Checking for memory leaks..."
+step=c
+valgrind --leak-check=full $openmp_exe $args > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while checking mem (step $step), bailing...\n\n\n"; exit $x; }
+printf "...done.\n"
+echo ""
+printf "Profiling..."
+step=d
+mkdir -p $gmon_dir
+cd $gmon_dir
+$openmp_dbg $args > /dev/null 2>&1 || { x=$? printf "\nfailed while profiling (step $step), bailing...\n\n\n"; exit $x; }
+gprof $openmp_dbg gmon.out > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while profiling (step $step), bailing...\n\n\n"; exit $x; }
+cd $prj_root
+printf "...done.\n"
+echo ""
+
+# build gran
+goal=gran
+step=e
+# granular version doesn't need built separately as it is simply the same as
+# the non-granular version (simply differs by providing granularity instead of
+# accepting default of 4)
+printf "Skipping building of separate granular binaries...\n"
+cp outputs/a.out outputs/e.out
+cp outputs/a.err outputs/e.err
+echo ""
+# printf "Building granular_multithreaded_life binaries..."
+# make $goal > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while building $goal (step $step), bailing...\n\n\n"; exit $x; }
+# make PRF=true $goal > /dev/null 2>&1 || { x=$? printf "\nfailed while building PRF $goal, bailing...\n\n\n"; exit $x; }
+# printf "...done.\n"
+# echo ""
+
+# run tests
+# printf "Measuring runtime..."
+# step=f
+# for g in {1..10}; do
+#     echo "with G=$g..." >> $report_dir/$step.err
+#     { time $openmp_exe -g $g $args; } >> $report_dir/$step.out 2>> $report_dir/$step.err || { x=$? printf "\nfailed while measuring time (step $step), bailing...\n\n\n"; exit $x; }
+#     echo "" >> $report_dir/$step.err
+# done
+# printf "...done.\n"
+# echo ""
+printf "Checking for memory leaks..."
+step=f
+# step=g
+valgrind --leak-check=full $openmp_exe -g 10 $args > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while checking mem (step $step), bailing...\n\n\n"; exit $x; }
+printf "...done.\n"
+echo ""
+printf "Profiling..."
+step=g
+# step=h
+mkdir -p $gmon_dir
+cd $gmon_dir
+$openmp_dbg -g 10 $args > /dev/null 2>&1 || { x=$? printf "\nfailed while profiling (step $step), bailing...\n\n\n"; exit $x; }
+gprof $openmp_dbg gmon.out > $report_dir/$step.out 2> $report_dir/$step.err || { x=$? printf "\nfailed while profiling (step $step), bailing...\n\n\n"; exit $x; }
+printf "...done.\n"
+echo ""

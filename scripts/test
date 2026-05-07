@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BERK="$SCRIPT_DIR/target/release/bin/berkeley_life"
-WORKER="$SCRIPT_DIR/target/release/bin/berkeley_worker"
+prj_root=`dirname $(realpath "$0")`/..
+BERK="$prj_root/target/release/bin/berkeley_life"
+WORKER="$prj_root/target/release/bin/berkeley_worker"
 
 PASS=0
 FAIL=0
 NEXT_PORT=9000
 
 echo "Building..."
-make -C "$SCRIPT_DIR" berk worker
+make -C "$prj_root" berk worker
 
 run_test() {
     local name="$1" size="$2" cycles="$3" init="$4" expected="$5"

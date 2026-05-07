@@ -2,8 +2,8 @@ TODO:
 
 - [x] implement distributed life w/ berkely sockets
 - [x] test that it works w/ multiple procs on one machine using loopback
-- [ ] script fabric setup
-- [ ] gen report on fabric
+- [x] script fabric setup
+- [x] gen report on fabric
 
 ---
 

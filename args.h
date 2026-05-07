@@ -6,6 +6,7 @@ typedef struct {
   unsigned int num_parts;
   unsigned long *parts;
   char *init_world;
+  unsigned short port;
 } Config;
 
 Config parse_args(int argc, char *const *argv);

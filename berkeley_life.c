@@ -14,153 +14,97 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-
-gcc life.c -o life # -pg
-valgrind -s --leak-check=full --show-leak-kinds=all \
-  ./life -s 20 -c 20 \
-  -i 010000000001000000000010000000010000000011100000000100000000
-
-./life -s 3 -c 3 -i 011001010
-
-./life -s 5 -c 10 -i 011001010110101111
-
-./life -s 20 -c 10 \
-  -i 011001010110101111011001010110101111010111101010101111100110111
-
-# Glider and blinker:
-./life -s 20 -c 20 \
-  -i 010000000001000000000010000000010000000011100000000100000000
-
-# Bee-hive and loaf:
-./life -s 10 -c 100 \
-  -i 010000000001000000000010000000010000000011100000000100000000
 */
-// fix error w/ unknown * ‘pthread_barrier_*’ caused by -std=c99 compile time
-// flag
-#define _POSIX_C_SOURCE 200112L /* Or higher */
-// Source - https://stackoverflow.com/a/61648098
-// Posted by Shawn, modified by community. See post 'Timeline' for change
-// history Retrieved 2026-02-20, License - CC BY-SA 4.0
+#define _POSIX_C_SOURCE 200112L
 
-#include <pthread.h>
-#include <stdbool.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <stdint.h>
+#include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #ifndef ARGH
 #include "args.h"
 #endif
-#ifndef STEPH
-#include "step.h"
+#ifndef PEERH
+#include "peer.h"
 #endif
 #ifndef WORLDH
 #include "world.h"
 #endif
 
-struct worker_args {
-#ifdef VERBOSE
-  unsigned int part_num;
-#endif
-  unsigned long part_start;
-  unsigned long part_end;
-  unsigned long cycles;
-  unsigned long world_size;
-  pthread_barrier_t *barrier;
-  char *world_history;
-};
+static void set_nodelay(Peer *p) {
+  int one = 1;
+  setsockopt(p->fd, IPPROTO_TCP, TCP_NODELAY, &one, (socklen_t)sizeof(one));
+}
 
-void *thread_worker(void *void_args) {
-#ifdef VERBOSE
-  printf("\n[thread_worker()] BEGIN for partition @ %d\n",
-         (*(struct worker_args *)void_args).part_num);
-  printf("(%s:%d)\n\n", __FILE__, __LINE__);
-#endif
-  struct worker_args args = *(struct worker_args *)void_args;
-
-  char *cur_step;
-  char *new_step = args.world_history;
-
-  for (unsigned long i = 1; i < args.cycles; i++) {
-    // move step pointers ahead one step
-    cur_step = new_step;
-    new_step = cur_step + (args.world_size * args.world_size);
-
-    // calculate this step, updating own portion of shared history state
-    step_part(cur_step, args.part_start, args.part_end, args.world_size,
-              new_step);
-
-    // wait for other threads to complete step before moving on
-    pthread_barrier_wait(args.barrier);
-  }
-#ifdef VERBOSE
-  printf("\n[thread_worker()] END for partition @ %d\n", args.part_num);
-  printf("(%s:%d)\n\n", __FILE__, __LINE__);
-#endif
-  return NULL;
+static int send_config(Peer *p, uint32_t world_size, uint32_t cycles,
+                       uint32_t part_start, uint32_t part_end) {
+  unsigned char buf[16];
+  buf[0]  = (unsigned char)(world_size >> 24); buf[1]  = (unsigned char)(world_size >> 16);
+  buf[2]  = (unsigned char)(world_size >> 8);  buf[3]  = (unsigned char)(world_size);
+  buf[4]  = (unsigned char)(cycles >> 24);     buf[5]  = (unsigned char)(cycles >> 16);
+  buf[6]  = (unsigned char)(cycles >> 8);      buf[7]  = (unsigned char)(cycles);
+  buf[8]  = (unsigned char)(part_start >> 24); buf[9]  = (unsigned char)(part_start >> 16);
+  buf[10] = (unsigned char)(part_start >> 8);  buf[11] = (unsigned char)(part_start);
+  buf[12] = (unsigned char)(part_end >> 24);   buf[13] = (unsigned char)(part_end >> 16);
+  buf[14] = (unsigned char)(part_end >> 8);    buf[15] = (unsigned char)(part_end);
+  return peer_send(p, buf, 16);
 }
 
 int main(int argc, char *const *argv) {
-  // parse args to config values
   Config cfg = parse_args(argc, argv);
-  // initialize state obj
   char *world_history = init_world(cfg.size, cfg.cycles, cfg.init_world);
 
-  // print initial state as first step
   print_world(world_history, cfg.size, 0);
   printf("\n");
 
-  // set up thread sync primatives
-  pthread_barrier_t barrier;
-  pthread_barrier_init(&barrier, NULL, cfg.num_parts + 1);
-  // and thread worker variables
-  unsigned long part_start;
-  unsigned long part_end = 0;
-  pthread_t threads[cfg.num_parts];
-  struct worker_args thread_args[cfg.num_parts];
-
-  // configure workers for each part & start a thread for each
-  for (unsigned int t = 0; t < cfg.num_parts; t++) {
-    part_start = part_end;
-    part_end = part_start + cfg.parts[t];
-
-    thread_args[t] = (struct worker_args){
-#ifdef VERBOSE
-        .part_num = t,
-#endif
-        .part_start = part_start,
-        .part_end = part_end,
-        .cycles = cfg.cycles,
-        .world_size = cfg.size,
-        .barrier = &barrier,
-        .world_history = world_history,
-    };
-#ifdef VERBOSE
-    printf("\n[main()] starting thread for partition %d\n", t);
-    printf("(%s:%d)\n\n", __FILE__, __LINE__);
-#endif
-
-    pthread_create(&threads[t], NULL, &thread_worker, (void *)&thread_args[t]);
+  // accept one connection per worker on consecutive ports
+  Peer **peers = malloc(cfg.num_parts * sizeof(*peers));
+  for (unsigned int i = 0; i < cfg.num_parts; i++) {
+    peers[i] =
+        peer_accept((unsigned short)((unsigned int)cfg.port + i));
+    if (!peers[i]) {
+      fprintf(stderr, "failed to accept worker %u\n", i);
+      return EXIT_FAILURE;
+    }
+    set_nodelay(peers[i]);
   }
 
-  // main thread will print each step
-  for (unsigned long i = 1; i < cfg.cycles; i++) {
-    // wait for threads to signal a step is complete
-    pthread_barrier_wait(&barrier);
-    // then print that step
-    print_world(world_history, cfg.size, i);
+  // send each worker its config in one shot: world_size, cycles, part_start, part_end
+  unsigned long part_start = 0;
+  for (unsigned int i = 0; i < cfg.num_parts; i++) {
+    unsigned long part_end = part_start + cfg.parts[i];
+    send_config(peers[i], (uint32_t)cfg.size, (uint32_t)cfg.cycles,
+                (uint32_t)part_start, (uint32_t)part_end);
+    part_start = part_end;
+  }
+
+  unsigned long step_size = cfg.size * cfg.size;
+
+  for (unsigned long c = 1; c < cfg.cycles; c++) {
+    char *cur = world_history + (c - 1) * step_size;
+    char *nxt = world_history + c * step_size;
+
+    // for each worker: send current step, then collect computed partition
+    unsigned long ps = 0;
+    for (unsigned int i = 0; i < cfg.num_parts; i++) {
+      peer_send(peers[i], (const unsigned char *)cur, step_size);
+      peer_recv(peers[i], (unsigned char *)(nxt + ps * cfg.size),
+                cfg.parts[i] * cfg.size);
+      ps += cfg.parts[i];
+    }
+
+    print_world(world_history, cfg.size, c);
     printf("\n");
   }
 
-  // wait for threads to close
-  for (unsigned int t = 0; t < cfg.num_parts; t++) {
-    pthread_join(threads[t], NULL);
-#ifdef VERBOSE
-    printf("\n[main()] thread for partition %d ended\n", t);
-    printf("(%s:%d)\n\n", __FILE__, __LINE__);
-#endif
+  for (unsigned int i = 0; i < cfg.num_parts; i++) {
+    peer_close(peers[i]);
   }
 
+  free(peers);
   free(world_history);
   free(cfg.init_world);
   free(cfg.parts);

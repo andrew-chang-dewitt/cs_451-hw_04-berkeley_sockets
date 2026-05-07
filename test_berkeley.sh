@@ -3,13 +3,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BERK="$SCRIPT_DIR/target/release/bin/berkeley_life"
+WORKER="$SCRIPT_DIR/target/release/bin/berkeley_worker"
 
 PASS=0
 FAIL=0
+NEXT_PORT=9000
 
-# let make determine if/when to build BERK
 echo "Building..."
-make -C "$SCRIPT_DIR" berk
+make -C "$SCRIPT_DIR" berk worker
 
 run_test() {
     local name="$1" size="$2" cycles="$3" init="$4" expected="$5"
@@ -17,8 +18,33 @@ run_test() {
     local granularities=("$@")
 
     for g in "${granularities[@]}"; do
+        local port=$NEXT_PORT
+        NEXT_PORT=$(( NEXT_PORT + g ))
+
+        # start main first so each port is in LISTEN state before workers connect
+        # (WSL2 loopback does not send RST for unlistened ports, so SYN retransmit
+        #  corrupts connection state — workers must connect to a ready port)
+        local tmp
+        tmp=$(mktemp)
+        "$BERK" -s "$size" -c "$cycles" -i "$init" -g "$g" -P "$port" > "$tmp" &
+        local main_pid=$!
+
+        local worker_pids=()
+        for (( i=0; i<g; i++ )); do
+            sleep 0.15   # let main call peer_accept(port+i) before worker connects
+            "$WORKER" 127.0.0.1 $(( port + i )) &
+            worker_pids+=($!)
+        done
+
+        wait "$main_pid"
         local result
-        result=$("$BERK" -s "$size" -c "$cycles" -i "$init" -g "$g")
+        result=$(cat "$tmp")
+        rm -f "$tmp"
+
+        for pid in "${worker_pids[@]}"; do
+            wait "$pid" || true
+        done
+
         if [[ "$result" == "$expected" ]]; then
             echo "PASS  $name  g=$g"
             (( ++PASS ))

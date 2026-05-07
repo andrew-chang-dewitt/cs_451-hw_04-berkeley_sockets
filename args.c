@@ -10,7 +10,7 @@
 #endif
 
 const Config default_config = {
-    .size = 5, .cycles = 5, .num_parts = 4,
+    .size = 5, .cycles = 5, .num_parts = 4, .port = 9000,
     // .parts is NULL
     // .init_world is NULL
 };
@@ -19,7 +19,7 @@ Config parse_args(const int argc, char *const *argv) {
   Config config = default_config;
 
   int option;
-  while ((option = getopt(argc, argv, "s:i:c:g:")) != -1) {
+  while ((option = getopt(argc, argv, "s:i:c:g:P:")) != -1) {
     switch (option) {
     case 'i': // initial state
       config.init_world = malloc(strlen(optarg) + 1);
@@ -33,6 +33,9 @@ Config parse_args(const int argc, char *const *argv) {
       break;
     case 'g': // how many parts to break each step into
       config.num_parts = (unsigned int)strtoul(optarg, NULL, 10);
+      break;
+    case 'P': // base TCP port for worker connections
+      config.port = (unsigned short)strtoul(optarg, NULL, 10);
       break;
     default:
       // FIXME: print error message.

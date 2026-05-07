@@ -49,13 +49,15 @@ SRC_DIR   := $(LOC)
 # https://make.mad-scientist.net/papers/advanced-auto-dependency-generation/#tldr
 DEP_FLAGS  = -MT $@ -MMD -MP -MF $(DEP_DIR)/$*.d
 
-NAMES     := life multithreaded_life granular_multithreaded_life
+NAMES     := life multithreaded_life granular_multithreaded_life test_peer
 SRCS      := $(wildcard $(SRC_DIR)/*.c)
 BINS      := $(NAMES:%=$(BIN_DIR)/%)
-OBJS       = $(patsubst $(SRC_DIR)/%.h,$(OBJ_DIR)/%.o,$(wildcard $(SRC_DIR)/*.h))
+# derive shared objects from .c files that are not binary entrypoints
+LIB_SRCS  := $(filter-out $(NAMES:%=$(SRC_DIR)/%.c), $(SRCS))
+OBJS       = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(LIB_SRCS))
 
 
-.PHONY: clean all life multi gran list_bins
+.PHONY: clean all life multi gran test list_bins
 
 all: life multi gran
 
@@ -67,6 +69,10 @@ multi: $(BIN_DIR)/multithreaded_life
 
 
 gran: $(BIN_DIR)/granular_multithreaded_life
+
+
+test: $(BIN_DIR)/test_peer
+	$(BIN_DIR)/test_peer
 
 
 $(BIN_DIR) $(OBJ_DIR) $(DEP_DIR): %:

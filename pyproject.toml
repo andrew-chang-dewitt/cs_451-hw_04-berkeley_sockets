@@ -1,0 +1,18 @@
+[project]
+name = "hw-04"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13.5"
+dependencies = [
+    "euporie>=2.10.3",
+    "fabrictestbed-extensions>=1.9.6",
+    "jupyter-console>=6.6.3",
+    "jupyterlab>=4.5.2",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.7.1",
+    "ty>=0.0.34",
+]

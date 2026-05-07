@@ -5,10 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build
 
 ```bash
-make all          # build all three binaries (release)
-make life         # single-threaded only
-make multi        # pthreads multithreaded only
-make gran         # granular multithreaded only
+make all          # build gran (release)
+make gran         # granular multithreaded life
+make test         # build & run peer tests
 make clean        # remove target/
 
 DBG=true make     # debug build (-O0 -g)
@@ -22,14 +21,13 @@ Binaries land in `target/release/bin/` or `target/debug/bin/` depending on mode.
 ## Run
 
 ```bash
-./target/release/bin/life -s <size> -c <cycles> -i <init_string>
-./target/release/bin/multithreaded_life -s <size> -c <cycles> -p <parts...> -i <init_string>
+./target/release/bin/granular_multithreaded_life -s <size> -c <cycles> -g <num_parts> -i <init_string>
 ```
 
-Example patterns:
+Example:
 ```bash
-# Glider and blinker (20x20, 20 cycles)
-./target/release/bin/life -s 20 -c 20 -i 010000000001000000000010000000010000000011100000000100000000
+# Glider (10x10, 8 cycles, 4 partitions)
+./target/release/bin/granular_multithreaded_life -s 10 -c 8 -g 4 -i 0100000000001000000011100000000000000000000000000000000000000000000000000000000000000000000000000000000000
 ```
 
 ## Python / FABRIC tooling
@@ -45,12 +43,10 @@ uv run setup.py   # provision FABRIC testbed slice (1 main + 10 child nodes)
 
 ## Architecture
 
-Three C implementations share common modules:
+C implementations share common modules:
 
 | File | Role |
 |------|------|
-| `life.c` | Single-threaded baseline |
-| `multithreaded_life.c` | Row-partitioned pthreads impl |
 | `granular_multithreaded_life.c` | Finer-grained thread partitioning |
 | `berkeley_life.c` | Distributed (FABRIC) — currently empty |
 | `world.c/h` | World state: `init_world`, `print_world`, accessors |
